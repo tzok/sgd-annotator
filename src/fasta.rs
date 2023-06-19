@@ -104,13 +104,13 @@ impl Fasta {
     }
 
     pub fn coding_ranges(&self) -> Option<Vec<GenomicRange>> {
-        let main_regex = Regex::new(r"Chr ([IVX]+|Mito) from (\d+)-(\d+)").unwrap();
+        let main_regex = Regex::new(r"Chr ([IVX]+|Mito) from ((\d+-\d+,)+)").unwrap();
         let main_match = main_regex.captures(&self.header)?;
         let chromosome = &main_match[1];
-        let regex = Regex::new(r"(\d+-\d+),").unwrap();
+        let regex = Regex::new(r"(\d+)-(\d+)").unwrap();
         let mut result = Vec::new();
 
-        for captures in regex.captures_iter(&main_match[0]) {
+        for captures in regex.captures_iter(&main_match[2]) {
             let from: usize = captures[1].parse().unwrap();
             let to: usize = captures[2].parse().unwrap();
 
@@ -128,6 +128,22 @@ impl Fasta {
         }
 
         Some(result)
+    }
+
+    pub fn noncoding_ranges(&self) -> Option<Vec<GenomicRange>> {
+        if let Some(coding) = self.coding_ranges() {
+            if coding.len() > 1 {
+                let mut result = Vec::new();
+                for i in 1..coding.len() {
+                    result.push(GenomicRange {
+                        chromosome: coding[i].chromosome.clone(),
+                        range: coding[i - 1].range.end..coding[i].range.start,
+                    })
+                }
+                return Some(result);
+            }
+        }
+        None
     }
 
     pub fn systematic_name(&self) -> String {
