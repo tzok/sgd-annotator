@@ -1,6 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::{fasta::load_fasta_gz, fasta::load_utr_fasta_gz, translator::GenomicRange};
+    use crate::{
+        fasta::load_fasta_gz,
+        fasta::{load_utr_fasta_gz, FastaType},
+        translator::GenomicRange,
+    };
     use std::path::Path;
 
     #[test]
@@ -9,6 +13,7 @@ mod tests {
 
         assert!(fasta.contains_key("YAL068C"));
         let gene = fasta.get("YAL068C").unwrap();
+        assert_eq!(gene.fasta_type(), FastaType::Gene);
         assert_eq!(gene.systematic_name(), "YAL068C");
         assert_eq!(gene.standard_name(), "PAU8");
         assert_eq!(
@@ -21,6 +26,7 @@ mod tests {
 
         assert!(fasta.contains_key("YAL067W-A"));
         let gene = fasta.get("YAL067W-A").unwrap();
+        assert_eq!(gene.fasta_type(), FastaType::Gene);
         assert_eq!(gene.systematic_name(), "YAL067W-A");
         assert_eq!(gene.standard_name(), "YAL067W-A");
         assert_eq!(
@@ -38,6 +44,7 @@ mod tests {
 
         assert!(fasta.contains_key("YAL068C"));
         let gene = fasta.get("YAL068C").unwrap();
+        assert_eq!(gene.fasta_type(), FastaType::Gene);
         assert_eq!(gene.systematic_name(), "YAL068C");
         assert_eq!(gene.standard_name(), "PAU8");
         let coding = gene.coding_ranges();
@@ -56,6 +63,7 @@ mod tests {
 
         assert!(fasta.contains_key("YAL003W"));
         let gene = fasta.get("YAL003W").unwrap();
+        assert_eq!(gene.fasta_type(), FastaType::Gene);
         assert_eq!(gene.systematic_name(), "YAL003W");
         assert_eq!(gene.standard_name(), "EFB1");
         let coding = gene.coding_ranges();
@@ -95,9 +103,10 @@ mod tests {
 
         assert!(fasta.contains_key("YAL067C"));
         let gene = fasta.get("YAL067C").unwrap();
-        assert_eq!(gene.systematic_name_for_utr(), "YAL067C");
+        assert_eq!(gene.fasta_type(), FastaType::UTR);
+        assert_eq!(gene.systematic_name(), "YAL067C");
         assert_eq!(
-            gene.genomic_range_for_utr(),
+            gene.genomic_range(),
             GenomicRange {
                 chromosome: "I".to_string(),
                 range: 9016..9049,
@@ -106,12 +115,30 @@ mod tests {
 
         assert!(fasta.contains_key("YAL066W"));
         let gene = fasta.get("YAL066W").unwrap();
-        assert_eq!(gene.systematic_name_for_utr(), "YAL066W");
+        assert_eq!(gene.fasta_type(), FastaType::UTR);
+        assert_eq!(gene.systematic_name(), "YAL066W");
         assert_eq!(
-            gene.genomic_range_for_utr(),
+            gene.genomic_range(),
             GenomicRange {
                 chromosome: "I".to_string(),
                 range: 9807..10091,
+            }
+        );
+    }
+
+    #[test]
+    fn fasta_chromosome() {
+        let fasta = load_fasta_gz(Path::new("../data/chr01.fsa.gz"));
+
+        assert!(fasta.contains_key("chrI"));
+        let gene = fasta.get("chrI").unwrap();
+        assert_eq!(gene.fasta_type(), FastaType::Chromosome);
+        assert_eq!(gene.systematic_name(), "chrI");
+        assert_eq!(
+            gene.genomic_range(),
+            GenomicRange {
+                chromosome: "I".to_string(),
+                range: 1..230219,
             }
         );
     }

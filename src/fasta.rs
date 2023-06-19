@@ -16,6 +16,13 @@ pub struct Fasta {
     sequence: String,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum FastaType {
+    Chromosome,
+    Gene,
+    UTR,
+}
+
 impl Fasta {
     fn new(header: &str, sequence: &str) -> Self {
         Self {
@@ -49,7 +56,38 @@ impl Fasta {
         }
     }
 
+    pub fn fasta_type(&self) -> FastaType {
+        if self.header.starts_with(">sacCer3") {
+            return FastaType::UTR;
+        } else if self.header.starts_with(">tpg") || self.header.starts_with(">ref") {
+            return FastaType::Chromosome;
+        }
+        FastaType::Gene
+    }
+
     pub fn genomic_range(&self) -> GenomicRange {
+        match self.fasta_type() {
+            FastaType::Chromosome => self.genomic_range_for_chromosome(),
+            FastaType::Gene => self.genomic_range_for_gene(),
+            FastaType::UTR => self.genomic_range_for_utr(),
+        }
+    }
+
+    fn genomic_range_for_chromosome(&self) -> GenomicRange {
+        let regex = Regex::new(r"\[chromosome=([IVX]+|mitochondrion)\]").unwrap();
+        let capture = regex.captures(&self.header).unwrap();
+        let chromosome = capture[1].to_string();
+        GenomicRange {
+            chromosome: if chromosome == "mitochondrion" {
+                "Mito".to_string()
+            } else {
+                chromosome
+            },
+            range: 1..self.sequence.len() + 1,
+        }
+    }
+
+    fn genomic_range_for_gene(&self) -> GenomicRange {
         let regex = Regex::new(r"Chr ([IVX]+|Mito) from (\d+)-(\d+)").unwrap();
         let captures = regex.captures(&self.header).unwrap();
         let chromosome = captures[1].to_string();
@@ -69,7 +107,7 @@ impl Fasta {
         }
     }
 
-    pub fn genomic_range_for_utr(&self) -> GenomicRange {
+    fn genomic_range_for_utr(&self) -> GenomicRange {
         let regex = Regex::new(r"range=chr([IVX]+):(\d+)-(\d+)").unwrap();
         let captures = regex.captures(&self.header).unwrap();
         let chromosome = captures[1].to_string();
@@ -89,21 +127,15 @@ impl Fasta {
         }
     }
 
-    pub fn genomic_range_for_chromosome(&self) -> GenomicRange {
-        let regex = Regex::new(r"\[chromosome=([IVX]+|mitochondrion)\]").unwrap();
-        let capture = regex.captures(&self.header).unwrap();
-        let chromosome = capture[1].to_string();
-        GenomicRange {
-            chromosome: if chromosome == "mitochondrion" {
-                "Mito".to_string()
-            } else {
-                chromosome
-            },
-            range: 1..self.sequence.len() + 1,
+    pub fn coding_ranges(&self) -> Option<Vec<GenomicRange>> {
+        match self.fasta_type() {
+            FastaType::Chromosome => None,
+            FastaType::Gene => self.coding_ranges_for_gene(),
+            FastaType::UTR => None,
         }
     }
 
-    pub fn coding_ranges(&self) -> Option<Vec<GenomicRange>> {
+    fn coding_ranges_for_gene(&self) -> Option<Vec<GenomicRange>> {
         let main_regex = Regex::new(r"Chr ([IVX]+|Mito) from ((\d+-\d+,)+)").unwrap();
         let main_match = main_regex.captures(&self.header)?;
         let chromosome = &main_match[1];
@@ -131,6 +163,14 @@ impl Fasta {
     }
 
     pub fn noncoding_ranges(&self) -> Option<Vec<GenomicRange>> {
+        match self.fasta_type() {
+            FastaType::Chromosome => None,
+            FastaType::Gene => self.noncoding_ranges_for_gene(),
+            FastaType::UTR => None,
+        }
+    }
+
+    fn noncoding_ranges_for_gene(&self) -> Option<Vec<GenomicRange>> {
         if let Some(coding) = self.coding_ranges() {
             if coding.len() > 1 {
                 let mut result = Vec::new();
@@ -147,6 +187,17 @@ impl Fasta {
     }
 
     pub fn systematic_name(&self) -> String {
+        match self.fasta_type() {
+            FastaType::Chromosome => self.systematic_name_for_chromosome(),
+            FastaType::Gene => self.systematic_name_for_gene(),
+            FastaType::UTR => self.systematic_name_for_utr(),
+        }
+    }
+    fn systematic_name_for_chromosome(&self) -> String {
+        format!("chr{}", self.genomic_range_for_chromosome().chromosome)
+    }
+
+    fn systematic_name_for_gene(&self) -> String {
         self.header[1..]
             .split_whitespace()
             .nth(0)
@@ -154,7 +205,27 @@ impl Fasta {
             .unwrap()
     }
 
+    fn systematic_name_for_utr(&self) -> String {
+        self.header
+            .split('_')
+            .nth(4)
+            .map(|s| s.to_string())
+            .unwrap()
+    }
+
     pub fn standard_name(&self) -> String {
+        match self.fasta_type() {
+            FastaType::Chromosome => self.standard_name_for_chromosome(),
+            FastaType::Gene => self.standard_name_for_gene(),
+            FastaType::UTR => self.standard_name_for_utr(),
+        }
+    }
+
+    fn standard_name_for_chromosome(&self) -> String {
+        self.systematic_name_for_chromosome()
+    }
+
+    fn standard_name_for_gene(&self) -> String {
         self.header[1..]
             .split_whitespace()
             .nth(1)
@@ -162,12 +233,8 @@ impl Fasta {
             .unwrap()
     }
 
-    pub fn systematic_name_for_utr(&self) -> String {
-        self.header
-            .split('_')
-            .nth(4)
-            .map(|s| s.to_string())
-            .unwrap()
+    fn standard_name_for_utr(&self) -> String {
+        self.systematic_name_for_utr()
     }
 }
 
