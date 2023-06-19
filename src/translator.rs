@@ -5,7 +5,7 @@ use glob::glob;
 use log::debug;
 use rayon::prelude::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum YeastChromosome {
     I,
     II,
@@ -77,7 +77,8 @@ impl Display for YeastChromosome {
 #[derive(Debug, PartialEq, Eq)]
 pub struct GenomicRange {
     pub chromosome: YeastChromosome,
-    pub range: Range<usize>,
+    pub start: usize,
+    pub end: usize,
 }
 
 pub struct FileRange {
@@ -85,7 +86,7 @@ pub struct FileRange {
 }
 
 pub struct Translator {
-    mapping: HashMap<String, usize>,
+    mapping: HashMap<YeastChromosome, usize>,
 }
 
 impl Translator {
@@ -101,27 +102,28 @@ impl Translator {
             })
             .collect();
 
-        let mut vec: Vec<(String, usize)> = Vec::new();
+        let mut vec: Vec<(YeastChromosome, usize)> = Vec::new();
         vec.par_extend(paths.par_iter().map(|path| {
             debug!("Loading chromosome {}", path.display());
             let chromosome = load_fasta_gz(&path);
             let fasta = chromosome.iter().map(|(_, fasta)| fasta).next().unwrap();
             (
-                fasta.systematic_name().to_string(),
+                fasta.genomic_range().chromosome.clone(),
                 find_sequence(genome, &fasta),
             )
         }));
 
-        let mapping: HashMap<String, usize> = vec.into_iter().collect();
+        let mapping: HashMap<YeastChromosome, usize> = vec.into_iter().collect();
         Self { mapping }
+    }
+
+    pub fn translate(&self, chromosome: &YeastChromosome, index: usize) -> usize {
+        self.mapping[chromosome] + index - 1
     }
 }
 
 fn find_sequence(genome: &str, fasta: &Fasta) -> usize {
-    if let Some(index) = genome.find(fasta.sequence.as_str()) {
-        return index;
-    }
-    if let Some(index) = genome.find(fasta.reversed().sequence.as_str()) {
+    if let Some(index) = genome.find(fasta.sequence().as_str()) {
         return index;
     }
     panic!(

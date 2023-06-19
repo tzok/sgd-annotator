@@ -25,7 +25,8 @@ mod tests {
             gene.genomic_range(),
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 1807..2169,
+                start: 1807,
+                end: 2169,
             }
         );
 
@@ -38,7 +39,8 @@ mod tests {
             gene.genomic_range(),
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 2480..2707,
+                start: 2480,
+                end: 2707,
             }
         );
     }
@@ -60,7 +62,8 @@ mod tests {
             coding[0],
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 1807..2169,
+                start: 1807,
+                end: 2169,
             }
         );
         let noncoding = gene.noncoding_ranges();
@@ -79,14 +82,16 @@ mod tests {
             coding[0],
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 142174..142253,
+                start: 142174,
+                end: 142253,
             }
         );
         assert_eq!(
             coding[1],
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 142620..143160,
+                start: 142620,
+                end: 143160,
             }
         );
         let noncoding = gene.noncoding_ranges();
@@ -97,7 +102,8 @@ mod tests {
             noncoding[0],
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 142253..142620,
+                start: 142253,
+                end: 142620,
             }
         );
     }
@@ -114,7 +120,8 @@ mod tests {
             gene.genomic_range(),
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 9016..9049,
+                start: 9016,
+                end: 9049,
             }
         );
 
@@ -126,7 +133,8 @@ mod tests {
             gene.genomic_range(),
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 9807..10091,
+                start: 9807,
+                end: 10091,
             }
         );
     }
@@ -143,7 +151,8 @@ mod tests {
             gene.genomic_range(),
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                range: 1..230219,
+                start: 1,
+                end: 230218,
             }
         );
     }
@@ -153,6 +162,14 @@ mod tests {
         init();
 
         let genome = load_genome_gz(Path::new("../data/tests/genome.txt.gz"));
+        let sample = load_fasta_gz(Path::new("../data/tests/sample.fasta.gz"));
         let translator = Translator::new(&genome);
+
+        assert!(sample.contains_key("YAL068C"));
+        let fasta = sample.get("YAL068C").unwrap();
+        let range = fasta.genomic_range();
+        let start = translator.translate(&range.chromosome, range.start);
+        let end = translator.translate(&range.chromosome, range.end);
+        assert_eq!(&genome[start..=end], fasta.sequence());
     }
 }

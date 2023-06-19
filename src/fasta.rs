@@ -14,7 +14,7 @@ use crate::translator::{GenomicRange, YeastChromosome};
 #[derive(Debug)]
 pub struct Fasta {
     pub header: String,
-    pub sequence: String,
+    sequence: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -39,22 +39,44 @@ impl Fasta {
         }
     }
 
-    pub fn reversed(&self) -> Self {
-        Self {
-            header: self.header.to_string(),
-            sequence: self
-                .sequence
-                .chars()
-                .rev()
-                .map(|c| match c {
-                    'A' => 'U',
-                    'U' => 'A',
-                    'C' => 'G',
-                    'G' => 'C',
-                    _ => c,
-                })
-                .collect(),
+    pub fn sequence(&self) -> String {
+        match self.fasta_type() {
+            FastaType::Chromosome => self.sequence_for_chromosome(),
+            FastaType::Gene => self.sequence_for_gene(),
+            FastaType::UTR => self.sequence_for_utr(),
         }
+    }
+
+    fn sequence_for_chromosome(&self) -> String {
+        self.sequence.to_string()
+    }
+
+    fn sequence_for_gene(&self) -> String {
+        if self.header.contains("reverse complement") {
+            return self.complementary_sequence();
+        }
+        self.sequence.to_string()
+    }
+
+    fn sequence_for_utr(&self) -> String {
+        if self.header.contains("strand=-") {
+            return self.complementary_sequence();
+        }
+        self.sequence.to_string()
+    }
+
+    fn complementary_sequence(&self) -> String {
+        self.sequence
+            .chars()
+            .rev()
+            .map(|c| match c {
+                'A' => 'U',
+                'U' => 'A',
+                'C' => 'G',
+                'G' => 'C',
+                _ => c,
+            })
+            .collect()
     }
 
     pub fn fasta_type(&self) -> FastaType {
@@ -82,7 +104,8 @@ impl Fasta {
             let chromosome = YeastChromosome::from_str(&s[1]).unwrap();
             return GenomicRange {
                 chromosome,
-                range: 1..self.sequence.len() + 1,
+                start: 1,
+                end: self.sequence.len(),
             };
         }
 
@@ -99,12 +122,14 @@ impl Fasta {
         if from < to {
             GenomicRange {
                 chromosome: chromosome,
-                range: from..to,
+                start: from,
+                end: to,
             }
         } else {
             GenomicRange {
                 chromosome: chromosome,
-                range: to..from,
+                start: to,
+                end: from,
             }
         }
     }
@@ -119,12 +144,14 @@ impl Fasta {
         if from < to {
             GenomicRange {
                 chromosome: chromosome,
-                range: from..to,
+                start: from,
+                end: to,
             }
         } else {
             GenomicRange {
                 chromosome: chromosome,
-                range: to..from,
+                start: to,
+                end: from,
             }
         }
     }
@@ -151,12 +178,14 @@ impl Fasta {
             if from < to {
                 result.push(GenomicRange {
                     chromosome: chromosome.clone(),
-                    range: from..to,
+                    start: from,
+                    end: to,
                 });
             } else {
                 result.push(GenomicRange {
                     chromosome: chromosome.clone(),
-                    range: to..from,
+                    start: to,
+                    end: from,
                 });
             }
         }
@@ -179,7 +208,8 @@ impl Fasta {
                 for i in 1..coding.len() {
                     result.push(GenomicRange {
                         chromosome: coding[i].chromosome.clone(),
-                        range: coding[i - 1].range.end..coding[i].range.start,
+                        start: coding[i - 1].end,
+                        end: coding[i].start,
                     })
                 }
                 return Some(result);
