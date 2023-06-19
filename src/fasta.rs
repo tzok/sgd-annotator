@@ -283,6 +283,9 @@ pub fn load_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
             if content.starts_with(">") {
                 if !header.is_empty() {
                     let fasta = Fasta::new(&header, &sequence);
+                    if result.contains_key(&fasta.systematic_name()) {
+                        panic!("Duplicate fasta: {}", fasta.systematic_name());
+                    }
                     result.insert(fasta.systematic_name(), fasta);
                     header.clear();
                     sequence.clear();
@@ -296,6 +299,9 @@ pub fn load_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
 
     if !header.is_empty() {
         let fasta = Fasta::new(&header, &sequence);
+        if result.contains_key(&fasta.systematic_name()) {
+            panic!("Duplicate fasta: {}", fasta.systematic_name());
+        }
         result.insert(fasta.systematic_name(), fasta);
     }
 

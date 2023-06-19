@@ -165,11 +165,46 @@ mod tests {
         let sample = load_fasta_gz(Path::new("../data/tests/sample.fasta.gz"));
         let translator = Translator::new(&genome);
 
-        assert!(sample.contains_key("YAL068C"));
-        let fasta = sample.get("YAL068C").unwrap();
-        let range = fasta.genomic_range();
-        let start = translator.translate(&range.chromosome, range.start);
-        let end = translator.translate(&range.chromosome, range.end);
-        assert_eq!(&genome[start..=end], fasta.sequence());
+        for name in vec![
+            "YAL068C",
+            "YBL113C",
+            "YCL075W",
+            "YDL248W",
+            "YEL077C",
+            "YFL068W",
+            "YGL263W",
+            "YHL050C",
+            "YIL177C",
+            "YJL225C",
+            "YKL224C",
+            "YLL067C",
+            "YML133C",
+            "YNL339C",
+            "YOL166W-A",
+            "YPL283C",
+            "YAL067C",
+            "YEL073C",
+            "YJL218W",
+            "YBL107C",
+            "YDR227W",
+            "YIL169C",
+            "YFL062W",
+            "YKL169C",
+            "YOL164W",
+            "YCL064C",
+            "YGL263W",
+            "YLR125W",
+            "YNL331C",
+            "YPL279C",
+            "YHL048W",
+            "YML131W",
+        ] {
+            assert!(sample.contains_key(name));
+            let fasta = sample.get(name).unwrap();
+            let range = fasta.genomic_range();
+            let start = translator.translate(&range.chromosome, range.start);
+            let end = translator.translate(&range.chromosome, range.end);
+            assert_eq!(&genome[start..=end], fasta.sequence());
+        }
     }
 }
