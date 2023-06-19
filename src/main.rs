@@ -25,9 +25,10 @@ struct Args {
     output: String,
 }
 
-fn load_genome(path: &Path) -> String {
+fn load_genome_gz(path: &Path) -> String {
     let file = File::open(path).unwrap();
-    let reader = BufReader::new(file);
+    let decoder = GzDecoder::new(file);
+    let reader = BufReader::new(decoder);
     let mut result = String::new();
 
     for (i, line) in reader.lines().enumerate() {
@@ -46,31 +47,6 @@ fn load_genome(path: &Path) -> String {
 
     result
 }
-
-// fn find_sequence(
-//     genome: &str,
-//     genomic_1000: &HashMap<String, Fasta>,
-//     genomic: &HashMap<String, Fasta>,
-//     name: &str,
-//     reverse: bool,
-// ) -> Option<FileRange> {
-//     let fasta_1000 = genomic_1000.get(name)?;
-//     let fasta = genomic.get(name)?;
-
-//     if reverse {
-//         let index_1000 = genome.find(fasta_1000.reversed().sequence.as_str())?;
-//         let index = genome[index_1000..].find(fasta.reversed().sequence.as_str())?;
-//         Some(FileRange {
-//             range: index_1000 + index..index_1000 + index + fasta.sequence.len(),
-//         })
-//     } else {
-//         let index_1000 = genome.find(fasta_1000.sequence.as_str())?;
-//         let index = genome[index_1000..].find(fasta.sequence.as_str())?;
-//         Some(FileRange {
-//             range: index_1000 + index..index_1000 + index + fasta.sequence.len(),
-//         })
-//     }
-// }
 
 // fn collect_found(
 //     genome: &str,
@@ -382,7 +358,7 @@ fn load_genome(path: &Path) -> String {
 fn main() {
     let args = Args::parse();
 
-    let genome = load_genome(Path::new(&args.input));
+    let genome = load_genome_gz(Path::new(&args.input));
 
     // let orf_genomic_1000 = load_fasta_gz(Path::new("../data/orf_genomic_1000.fasta.gz"));
     // let orf_genomic = load_fasta_gz(Path::new("../data/orf_genomic.fasta.gz"));

@@ -3,9 +3,14 @@ mod tests {
     use crate::{
         fasta::load_fasta_gz,
         fasta::{load_utr_fasta_gz, FastaType},
-        translator::GenomicRange,
+        load_genome_gz,
+        translator::{GenomicRange, Translator, YeastChromosome},
     };
     use std::path::Path;
+
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
 
     #[test]
     fn fasta_genomic() {
@@ -19,7 +24,7 @@ mod tests {
         assert_eq!(
             gene.genomic_range(),
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 1807..2169,
             }
         );
@@ -32,7 +37,7 @@ mod tests {
         assert_eq!(
             gene.genomic_range(),
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 2480..2707,
             }
         );
@@ -54,7 +59,7 @@ mod tests {
         assert_eq!(
             coding[0],
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 1807..2169,
             }
         );
@@ -73,14 +78,14 @@ mod tests {
         assert_eq!(
             coding[0],
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 142174..142253,
             }
         );
         assert_eq!(
             coding[1],
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 142620..143160,
             }
         );
@@ -91,7 +96,7 @@ mod tests {
         assert_eq!(
             noncoding[0],
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 142253..142620,
             }
         );
@@ -108,7 +113,7 @@ mod tests {
         assert_eq!(
             gene.genomic_range(),
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 9016..9049,
             }
         );
@@ -120,7 +125,7 @@ mod tests {
         assert_eq!(
             gene.genomic_range(),
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 9807..10091,
             }
         );
@@ -137,9 +142,17 @@ mod tests {
         assert_eq!(
             gene.genomic_range(),
             GenomicRange {
-                chromosome: "I".to_string(),
+                chromosome: YeastChromosome::I,
                 range: 1..230219,
             }
         );
+    }
+
+    #[test]
+    fn translator() {
+        init();
+
+        let genome = load_genome_gz(Path::new("../data/tests/genome.txt.gz"));
+        let translator = Translator::new(&genome);
     }
 }

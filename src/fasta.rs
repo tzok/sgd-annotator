@@ -3,17 +3,18 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
+    str::FromStr,
 };
 
 use flate2::read::GzDecoder;
 use regex::Regex;
 
-use crate::translator::GenomicRange;
+use crate::translator::{GenomicRange, YeastChromosome};
 
 #[derive(Debug)]
 pub struct Fasta {
-    header: String,
-    sequence: String,
+    pub header: String,
+    pub sequence: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -38,7 +39,7 @@ impl Fasta {
         }
     }
 
-    fn reversed(&self) -> Self {
+    pub fn reversed(&self) -> Self {
         Self {
             header: self.header.to_string(),
             sequence: self
@@ -74,23 +75,24 @@ impl Fasta {
     }
 
     fn genomic_range_for_chromosome(&self) -> GenomicRange {
-        let regex = Regex::new(r"\[chromosome=([IVX]+|mitochondrion)\]").unwrap();
-        let capture = regex.captures(&self.header).unwrap();
-        let chromosome = capture[1].to_string();
-        GenomicRange {
-            chromosome: if chromosome == "mitochondrion" {
-                "Mito".to_string()
-            } else {
-                chromosome
-            },
-            range: 1..self.sequence.len() + 1,
+        let regex = Regex::new(r"\[chromosome=([IVX]+)\]").unwrap();
+        let capture = regex.captures(&self.header);
+
+        if let Some(s) = capture {
+            let chromosome = YeastChromosome::from_str(&s[1]).unwrap();
+            return GenomicRange {
+                chromosome,
+                range: 1..self.sequence.len() + 1,
+            };
         }
+
+        panic!("Failed to find chromosome in header {}", self.header);
     }
 
     fn genomic_range_for_gene(&self) -> GenomicRange {
         let regex = Regex::new(r"Chr ([IVX]+|Mito) from (\d+)-(\d+)").unwrap();
         let captures = regex.captures(&self.header).unwrap();
-        let chromosome = captures[1].to_string();
+        let chromosome = YeastChromosome::from_str(&captures[1]).unwrap();
         let from = captures[2].parse().unwrap();
         let to = captures[3].parse().unwrap();
 
@@ -110,7 +112,7 @@ impl Fasta {
     fn genomic_range_for_utr(&self) -> GenomicRange {
         let regex = Regex::new(r"range=chr([IVX]+):(\d+)-(\d+)").unwrap();
         let captures = regex.captures(&self.header).unwrap();
-        let chromosome = captures[1].to_string();
+        let chromosome = YeastChromosome::from_str(&captures[1]).unwrap();
         let from = captures[2].parse().unwrap();
         let to = captures[3].parse().unwrap();
 
@@ -138,7 +140,7 @@ impl Fasta {
     fn coding_ranges_for_gene(&self) -> Option<Vec<GenomicRange>> {
         let main_regex = Regex::new(r"Chr ([IVX]+|Mito) from ((\d+-\d+,)+)").unwrap();
         let main_match = main_regex.captures(&self.header)?;
-        let chromosome = &main_match[1];
+        let chromosome = YeastChromosome::from_str(&main_match[1]).unwrap();
         let regex = Regex::new(r"(\d+)-(\d+)").unwrap();
         let mut result = Vec::new();
 
@@ -148,12 +150,12 @@ impl Fasta {
 
             if from < to {
                 result.push(GenomicRange {
-                    chromosome: chromosome.to_string(),
+                    chromosome: chromosome.clone(),
                     range: from..to,
                 });
             } else {
                 result.push(GenomicRange {
-                    chromosome: chromosome.to_string(),
+                    chromosome: chromosome.clone(),
                     range: to..from,
                 });
             }
