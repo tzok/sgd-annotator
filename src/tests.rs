@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{fasta::load_fasta_gz, translator::GenomicRange};
+    use crate::{fasta::load_fasta_gz, fasta::load_utr_fasta_gz, translator::GenomicRange};
     use std::path::Path;
 
     #[test]
@@ -85,6 +85,33 @@ mod tests {
             GenomicRange {
                 chromosome: "I".to_string(),
                 range: 142253..142620,
+            }
+        );
+    }
+
+    #[test]
+    fn fasta_utr() {
+        let fasta = load_utr_fasta_gz(Path::new("../data/tests/utr.fasta.gz"));
+
+        assert!(fasta.contains_key("YAL067C"));
+        let gene = fasta.get("YAL067C").unwrap();
+        assert_eq!(gene.systematic_name_for_utr(), "YAL067C");
+        assert_eq!(
+            gene.genomic_range_for_utr(),
+            GenomicRange {
+                chromosome: "I".to_string(),
+                range: 9016..9049,
+            }
+        );
+
+        assert!(fasta.contains_key("YAL066W"));
+        let gene = fasta.get("YAL066W").unwrap();
+        assert_eq!(gene.systematic_name_for_utr(), "YAL066W");
+        assert_eq!(
+            gene.genomic_range_for_utr(),
+            GenomicRange {
+                chromosome: "I".to_string(),
+                range: 9807..10091,
             }
         );
     }

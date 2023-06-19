@@ -379,13 +379,6 @@ fn load_genome(path: &Path) -> String {
 //     }
 // }
 
-// fn load_utr(path: &Path) -> HashMap<String, Fasta> {
-//     load_fasta_gz(path)
-//         .into_iter()
-//         .map(|(_, fasta)| (fasta.systematic_name_for_utr(), fasta))
-//         .collect()
-// }
-
 fn main() {
     let args = Args::parse();
 

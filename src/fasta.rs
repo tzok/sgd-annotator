@@ -202,3 +202,10 @@ pub fn load_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
 
     result
 }
+
+pub fn load_utr_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
+    load_fasta_gz(path)
+        .into_iter()
+        .map(|(_, fasta)| (fasta.systematic_name_for_utr(), fasta))
+        .collect()
+}
