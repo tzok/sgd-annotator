@@ -1,11 +1,11 @@
-use std::{collections::HashMap, fmt::Display, ops::Range, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::fasta::{load_fasta_gz, Fasta};
 use glob::glob;
 use log::debug;
 use rayon::prelude::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum YeastChromosome {
     I,
     II,
@@ -76,7 +76,7 @@ impl Display for YeastChromosome {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GenomicRange {
     pub chromosome: YeastChromosome,
     pub start: usize,
@@ -113,8 +113,7 @@ impl Translator {
         Self { mapping }
     }
 
-    pub fn translate_fasta(&self, fasta: &Fasta) -> Option<(usize, usize)> {
-        let range = fasta.genomic_range();
+    pub fn translate_genomic_range(&self, range: &GenomicRange) -> Option<(usize, usize)> {
         let chromosome = &range.chromosome;
         Some((
             self.translate_nt(chromosome, range.start)?,

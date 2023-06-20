@@ -190,6 +190,7 @@ impl Fasta {
                 });
             }
         }
+        result.sort();
 
         Some(result)
     }
@@ -209,8 +210,8 @@ impl Fasta {
                 for i in 1..coding.len() {
                     result.push(GenomicRange {
                         chromosome: coding[i].chromosome.clone(),
-                        start: coding[i - 1].end,
-                        end: coding[i].start,
+                        start: coding[i - 1].end + 1,
+                        end: coding[i].start - 1,
                     })
                 }
                 return Some(result);
