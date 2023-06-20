@@ -266,7 +266,7 @@ fn store_result(input: &Path, output: &Path, annotations: Vec<Vec<String>>) {
                 for j in 0..count / 4 {
                     let _ = writer.write(
                         format!(
-                            "\tType {}\tSubtype {}\tSystematic name {}\tStandard name {}\n",
+                            "\tType {}\tSubtype {}\tSystematic name {}\tStandard name {}",
                             j + 1,
                             j + 1,
                             j + 1,
@@ -275,6 +275,7 @@ fn store_result(input: &Path, output: &Path, annotations: Vec<Vec<String>>) {
                         .as_bytes(),
                     );
                 }
+                let _ = writer.write("\n".as_bytes());
             } else {
                 for annotation in annotations.get(i - 1).unwrap().iter() {
                     let _ = writer.write(b"\t");
