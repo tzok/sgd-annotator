@@ -202,8 +202,12 @@ mod tests {
             assert!(sample.contains_key(name));
             let fasta = sample.get(name).unwrap();
             let range = fasta.genomic_range();
-            let start = translator.translate(&range.chromosome, range.start);
-            let end = translator.translate(&range.chromosome, range.end);
+            let start = translator
+                .translate_nt(&range.chromosome, range.start)
+                .unwrap();
+            let end = translator
+                .translate_nt(&range.chromosome, range.end)
+                .unwrap();
             assert_eq!(&genome[start..=end], fasta.sequence());
         }
     }

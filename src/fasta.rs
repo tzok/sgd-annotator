@@ -115,7 +115,8 @@ impl Fasta {
     fn genomic_range_for_gene(&self) -> GenomicRange {
         let regex = Regex::new(r"Chr ([IVX]+|Mito) from (\d+)-(\d+)").unwrap();
         let captures = regex.captures(&self.header).unwrap();
-        let chromosome = YeastChromosome::from_str(&captures[1]).unwrap();
+        let chromosome = YeastChromosome::from_str(&captures[1])
+            .expect(format!("Failed to match chromosome name in header {}", self.header).as_str());
         let from = captures[2].parse().unwrap();
         let to = captures[3].parse().unwrap();
 
@@ -283,10 +284,13 @@ pub fn load_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
             if content.starts_with(">") {
                 if !header.is_empty() {
                     let fasta = Fasta::new(&header, &sequence);
-                    if result.contains_key(&fasta.systematic_name()) {
-                        panic!("Duplicate fasta: {}", fasta.systematic_name());
+                    if !result.contains_key(&fasta.systematic_name()) {
+                        result.insert(fasta.systematic_name(), fasta);
+                    } else {
+                        if sequence.len() > result[&fasta.systematic_name()].sequence.len() {
+                            result.insert(fasta.systematic_name(), fasta);
+                        }
                     }
-                    result.insert(fasta.systematic_name(), fasta);
                     header.clear();
                     sequence.clear();
                 }
@@ -299,10 +303,13 @@ pub fn load_fasta_gz(path: &Path) -> HashMap<String, Fasta> {
 
     if !header.is_empty() {
         let fasta = Fasta::new(&header, &sequence);
-        if result.contains_key(&fasta.systematic_name()) {
-            panic!("Duplicate fasta: {}", fasta.systematic_name());
+        if !result.contains_key(&fasta.systematic_name()) {
+            result.insert(fasta.systematic_name(), fasta);
+        } else {
+            if sequence.len() > result[&fasta.systematic_name()].sequence.len() {
+                result.insert(fasta.systematic_name(), fasta);
+            }
         }
-        result.insert(fasta.systematic_name(), fasta);
     }
 
     result

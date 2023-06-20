@@ -23,6 +23,7 @@ pub enum YeastChromosome {
     XIV,
     XV,
     XVI,
+    Mito,
 }
 
 impl FromStr for YeastChromosome {
@@ -45,6 +46,7 @@ impl FromStr for YeastChromosome {
             "XIV" => Ok(Self::XIV),
             "XV" => Ok(Self::XV),
             "XVI" => Ok(Self::XVI),
+            "Mito" => Ok(Self::Mito),
             _ => Err(()),
         }
     }
@@ -69,7 +71,7 @@ impl Display for YeastChromosome {
             Self::XIV => write!(f, "XIV"),
             Self::XV => write!(f, "XV"),
             Self::XVI => write!(f, "XVI"),
-            _ => Err(std::fmt::Error),
+            Self::Mito => write!(f, "Mito"),
         }
     }
 }
@@ -79,10 +81,6 @@ pub struct GenomicRange {
     pub chromosome: YeastChromosome,
     pub start: usize,
     pub end: usize,
-}
-
-pub struct FileRange {
-    pub range: Range<usize>,
 }
 
 pub struct Translator {
@@ -103,31 +101,40 @@ impl Translator {
             .collect();
 
         let mut vec: Vec<(YeastChromosome, usize)> = Vec::new();
-        vec.par_extend(paths.par_iter().map(|path| {
+        vec.par_extend(paths.par_iter().filter_map(|path| {
             debug!("Loading chromosome {}", path.display());
             let chromosome = load_fasta_gz(&path);
-            let fasta = chromosome.iter().map(|(_, fasta)| fasta).next().unwrap();
-            (
-                fasta.genomic_range().chromosome.clone(),
-                find_sequence(genome, &fasta),
-            )
+            let fasta = chromosome.iter().map(|(_, fasta)| fasta).next()?;
+            let index = find_sequence(genome, &fasta)?;
+            Some((fasta.genomic_range().chromosome.clone(), index))
         }));
 
         let mapping: HashMap<YeastChromosome, usize> = vec.into_iter().collect();
         Self { mapping }
     }
 
-    pub fn translate(&self, chromosome: &YeastChromosome, index: usize) -> usize {
-        self.mapping[chromosome] + index - 1
+    pub fn translate_fasta(&self, fasta: &Fasta) -> Option<(usize, usize)> {
+        let range = fasta.genomic_range();
+        let chromosome = &range.chromosome;
+        Some((
+            self.translate_nt(chromosome, range.start)?,
+            self.translate_nt(chromosome, range.end)?,
+        ))
+    }
+
+    pub fn translate_nt(&self, chromosome: &YeastChromosome, index: usize) -> Option<usize> {
+        let base = self.mapping.get(chromosome)?;
+        Some(base + index - 1)
     }
 }
 
-fn find_sequence(genome: &str, fasta: &Fasta) -> usize {
+fn find_sequence(genome: &str, fasta: &Fasta) -> Option<usize> {
     if let Some(index) = genome.find(fasta.sequence().as_str()) {
-        return index;
+        return Some(index);
     }
-    panic!(
+    debug!(
         "Failed to find sequence {} in genome",
         fasta.systematic_name()
     );
+    None
 }

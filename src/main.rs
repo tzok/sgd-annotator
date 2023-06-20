@@ -1,15 +1,17 @@
 use std::{
+    cmp::{max, min},
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
-    ops::Range,
     path::Path,
 };
 
 use clap::Parser;
+use fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use flate2::read::GzDecoder;
-use rayon::prelude::*;
-use regex::Regex;
+
+use linked_hash_map::LinkedHashMap;
+use translator::Translator;
 
 mod fasta;
 mod tests;
@@ -179,75 +181,6 @@ fn load_genome_gz(path: &Path) -> String {
 //     result
 // }
 
-// fn determine_order(
-//     orf: &HashMap<String, (usize, usize)>,
-//     rna: &HashMap<String, (usize, usize)>,
-//     other: &HashMap<String, (usize, usize)>,
-// ) -> HashMap<String, usize> {
-//     let all: Vec<(&String, &(usize, usize))> =
-//         orf.iter().chain(rna.iter()).chain(other.iter()).collect();
-//     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-
-//     for i in 0..all.len() {
-//         let (name_i, (from_i, to_i)) = all[i];
-
-//         for j in i + 1..all.len() {
-//             let (name_j, (from_j, to_j)) = all[j];
-
-//             if (from_i <= from_j && from_j <= to_i)
-//                 || (from_i <= to_j && to_j <= to_i)
-//                 || (from_j <= from_i && from_i <= to_j)
-//                 || (from_j <= to_i && to_i <= to_j)
-//             {
-//                 if !graph.contains_key(name_i) {
-//                     graph.insert(name_i.to_string(), Vec::new());
-//                 }
-//                 graph.get_mut(name_i).unwrap().push(name_j.to_string());
-
-//                 if !graph.contains_key(name_j) {
-//                     graph.insert(name_j.to_string(), Vec::new());
-//                 }
-//                 graph.get_mut(name_j).unwrap().push(name_i.to_string());
-//             }
-//         }
-//     }
-
-//     let mut order: Vec<(String, usize)> = graph
-//         .iter()
-//         .map(|(name, vec)| (name.to_string(), vec.len()))
-//         .collect();
-//     order.sort_by_key(|(_, len)| len.to_owned());
-
-//     let mut colors: HashMap<String, usize> = HashMap::new();
-
-//     for (current, _) in order {
-//         let mut available = [true, true, true, true, true, true, true, true];
-
-//         if let Some(adjacent) = graph.get(&current) {
-//             for next in adjacent {
-//                 if let Some(color) = colors.get(next) {
-//                     available[*color] = false;
-//                 }
-//             }
-//         }
-
-//         for i in 0..available.len() {
-//             if available[i] {
-//                 colors.insert(current.to_string(), i);
-//                 break;
-//             }
-//         }
-//     }
-
-//     for (name, _) in all.iter() {
-//         if !colors.contains_key(*name) {
-//             colors.insert(name.to_string(), 0);
-//         }
-//     }
-
-//     colors
-// }
-
 // fn fill_annotations(
 //     annotations: &mut Vec<Vec<String>>,
 //     category: &str,
@@ -355,18 +288,131 @@ fn load_genome_gz(path: &Path) -> String {
 //     }
 // }
 
+fn translate_all(
+    orf_genomic: &HashMap<String, Fasta>,
+    rna_genomic: &HashMap<String, Fasta>,
+    other_genomic: &HashMap<String, Fasta>,
+    utr5p: &HashMap<String, Fasta>,
+    utr3p: &HashMap<String, Fasta>,
+    translator: Translator,
+) -> LinkedHashMap<String, (usize, usize)> {
+    let iterator = orf_genomic
+        .iter()
+        .chain(rna_genomic.iter())
+        .chain(other_genomic.iter());
+    let mut ranges = LinkedHashMap::new();
+
+    for (name, fasta) in iterator {
+        if let Some((mut start, mut end)) = translator.translate_fasta(fasta) {
+            if let Some(utr) = utr5p.get(name) {
+                if let Some((utr_start, utr_end)) = translator.translate_fasta(utr) {
+                    start = min(start, utr_start);
+                    end = max(end, utr_end);
+                }
+            }
+
+            if let Some(utr) = utr3p.get(name) {
+                if let Some((utr_start, utr_end)) = translator.translate_fasta(utr) {
+                    start = min(start, utr_start);
+                    end = max(end, utr_end);
+                }
+            }
+
+            ranges.insert(name.clone(), (start, end));
+        }
+    }
+
+    ranges
+}
+
+fn create_graph(ranges: &LinkedHashMap<String, (usize, usize)>) -> HashMap<String, Vec<String>> {
+    let names: Vec<&String> = ranges.iter().map(|(name, _)| name).collect();
+    let mut graph = HashMap::new();
+
+    for i in 0..names.len() {
+        let name_i = names.get(i).unwrap().to_string();
+        let (start_i, end_i) = ranges.get(&name_i).unwrap();
+
+        for j in (i + 1)..names.len() {
+            let name_j = names.get(j).unwrap().to_string();
+            let (start_j, end_j) = ranges.get(&name_j).unwrap();
+
+            if (start_i < start_j && start_j < end_i)
+                || (start_i < end_j && end_j < end_i)
+                || (start_j < start_i && start_i < end_j)
+                || (start_j < end_i && end_i < end_j)
+            {
+                if !graph.contains_key(&name_i) {
+                    graph.insert(name_i.clone(), Vec::new());
+                }
+                graph.get_mut(&name_i).unwrap().push(name_j.clone());
+
+                if !graph.contains_key(&name_j) {
+                    graph.insert(name_j.clone(), Vec::new());
+                }
+                graph.get_mut(&name_j).unwrap().push(name_i.clone());
+            }
+        }
+    }
+
+    graph
+}
+
+fn determine_order(graph: &HashMap<String, Vec<String>>) -> HashMap<String, usize> {
+    let mut colors: HashMap<String, usize> = HashMap::new();
+
+    for (current, _) in graph.iter() {
+        let mut available = [true, true, true, true, true, true, true, true, true, true];
+
+        if let Some(adjacent) = graph.get(current) {
+            for next in adjacent {
+                if let Some(color) = colors.get(next) {
+                    available[*color] = false;
+                }
+            }
+        }
+
+        for i in 0..available.len() {
+            if available[i] {
+                colors.insert(current.to_string(), i);
+                break;
+            }
+        }
+    }
+
+    colors
+}
+
 fn main() {
     let args = Args::parse();
 
     let genome = load_genome_gz(Path::new(&args.input));
+    let translator = Translator::new(&genome);
 
-    // let orf_genomic_1000 = load_fasta_gz(Path::new("../data/orf_genomic_1000.fasta.gz"));
-    // let orf_genomic = load_fasta_gz(Path::new("../data/orf_genomic.fasta.gz"));
-    // let orf_coding = load_fasta_gz(Path::new("../data/orf_coding.fasta.gz"));
+    let orf_genomic = load_fasta_gz(Path::new("../data/orf_genomic.fasta.gz"));
+    let rna_genomic = load_fasta_gz(Path::new("../data/rna_genomic.fasta.gz"));
+    let other_genomic = load_fasta_gz(Path::new("../data/other_features_genomic.fasta.gz"));
+
+    let utr5p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_5prime_UTRs.fsa.gz"));
+    let utr3p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_3prime_UTRs.fsa.gz"));
+
+    let ranges = translate_all(
+        &orf_genomic,
+        &rna_genomic,
+        &other_genomic,
+        &utr5p,
+        &utr3p,
+        translator,
+    );
+    let graph = create_graph(&ranges);
+    let order = determine_order(&graph);
+    println!("{:?}", order);
+
+    let orf_coding = load_fasta_gz(Path::new("../data/orf_coding.fasta.gz"));
+    let rna_coding = load_fasta_gz(Path::new("../data/rna_coding.fasta.gz"));
+
     // let mut orf_found = collect_found(&genome, &orf_genomic_1000, &orf_genomic);
 
-    // let utr5p = load_utr(Path::new("../data/SGD_all_ORFs_5prime_UTRs.fsa.gz"));
-    // let utr3p = load_utr(Path::new("../data/SGD_all_ORFs_3prime_UTRs.fsa.gz"));
     // extend_file_range_for_utr(&mut orf_found, &orf_genomic, &utr5p);
     // extend_file_range_for_utr(&mut orf_found, &orf_genomic, &utr3p);
 
@@ -379,22 +425,14 @@ fn main() {
     // update_utrs(&genome, &orf_found, &utr5p, "UTR 5'");
     // update_utrs(&genome, &orf_found, &utr3p, "UTR 3'");
 
-    // let rna_genomic_1000 = load_fasta_gz(Path::new("../data/rna_genomic_1000.fasta.gz"));
-    // let rna_genomic = load_fasta_gz(Path::new("../data/rna_genomic.fasta.gz"));
-    // let rna_coding = load_fasta_gz(Path::new("../data/rna_coding.fasta.gz"));
     // let rna_found = collect_found(&genome, &rna_genomic_1000, &rna_genomic);
     // update_exon_intron(&orf_found, &orf_coding);
-
-    // let other_genomic_1000 =
-    //     load_fasta_gz(Path::new("../data/other_features_genomic_1000.fasta.gz"));
-    // let other_genomic = load_fasta_gz(Path::new("../data/other_features_genomic.fasta.gz"));
 
     // let other_found = collect_found(&genome, &other_genomic_1000, &other_genomic);
 
     // let utr5p_found = update_utrs(&genome, &orf_found, &utr5p, "UTR 5'");
     // let utr3p_found = update_utrs(&genome, &orf_found, &utr3p, "UTR 3'");
 
-    // let order = determine_order(&orf_found, &rna_found, &other_found);
     // let max = order.iter().map(|(_, order)| order).max().unwrap();
 
     // let mut annotations = Vec::with_capacity(genome.len());
