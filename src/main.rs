@@ -10,7 +10,7 @@ use clap::Parser;
 use fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use flate2::read::GzDecoder;
 
-use translator::{GenomicRange, Translator};
+use translator::Translator;
 
 mod fasta;
 mod tests;
@@ -63,8 +63,8 @@ fn translate_all(
             translator.translate_genomic_range(&fasta.genomic_range())
         {
             if let Some(utr) = utr5p.get(*name) {
-                let fixed_range = dynamically_fix_range_for_utr(utr, translator, profile);
-                if let Some((utr_start, utr_end)) = translator.translate_genomic_range(&fixed_range)
+                if let Some((utr_start, utr_end)) =
+                    dynamically_fix_range_for_utr(utr, translator, profile)
                 {
                     start = min(start, utr_start);
                     end = max(end, utr_end);
@@ -72,8 +72,8 @@ fn translate_all(
             }
 
             if let Some(utr) = utr3p.get(*name) {
-                let fixed_range = dynamically_fix_range_for_utr(utr, translator, profile);
-                if let Some((utr_start, utr_end)) = translator.translate_genomic_range(&fixed_range)
+                if let Some((utr_start, utr_end)) =
+                    dynamically_fix_range_for_utr(utr, translator, profile)
                 {
                     start = min(start, utr_start);
                     end = max(end, utr_end);
@@ -197,18 +197,22 @@ fn fill_annotations(
 
         if category == "ORF" {
             if let Some(fasta) = utr5p.get(*name) {
-                let range = dynamically_fix_range_for_utr(fasta, translator, profile);
-                let (start, end) = translator.translate_genomic_range(&range).unwrap();
-                for i in start..=end {
-                    annotations[i][*order * 4 + 1] = "UTR 5'".to_string();
+                if let Some((start, end)) =
+                    dynamically_fix_range_for_utr(fasta, translator, profile)
+                {
+                    for i in start..=end {
+                        annotations[i][*order * 4 + 1] = "UTR 5'".to_string();
+                    }
                 }
             }
 
             if let Some(fasta) = utr3p.get(*name) {
-                let range = dynamically_fix_range_for_utr(fasta, translator, profile);
-                let (start, end) = translator.translate_genomic_range(&range).unwrap();
-                for i in start..=end {
-                    annotations[i][*order * 4 + 1] = "UTR 3'".to_string();
+                if let Some((start, end)) =
+                    dynamically_fix_range_for_utr(fasta, translator, profile)
+                {
+                    for i in start..=end {
+                        annotations[i][*order * 4 + 1] = "UTR 3'".to_string();
+                    }
                 }
             }
 
@@ -293,7 +297,7 @@ fn dynamically_fix_range_for_utr(
     fasta: &Fasta,
     translator: &Translator,
     profile: &Vec<f32>,
-) -> GenomicRange {
+) -> Option<(usize, usize)> {
     let range = fasta.genomic_range();
 
     if let Some((start, end)) = translator.translate_genomic_range(&range) {
@@ -302,30 +306,22 @@ fn dynamically_fix_range_for_utr(
 
         if (is_5p && is_plus) || (!is_5p && !is_plus) {
             for i in (start..=end).rev() {
-                let slice = &profile[i - 5..=i];
+                let slice = &profile[i - 6..i];
                 if slice.iter().all(|x| x.is_nan()) {
-                    return GenomicRange {
-                        chromosome: range.chromosome,
-                        start: i + 2, // +1 for skipping this nucleotide, +1 for counting from 1 not 0 in the profile file
-                        end: end,
-                    };
+                    return Some((i, end));
                 }
             }
         } else {
             for i in start..=end {
-                let slice = &profile[i..=i + 5];
+                let slice = &profile[i + 1..i + 7];
                 if slice.iter().all(|x| x.is_nan()) {
-                    return GenomicRange {
-                        chromosome: range.chromosome,
-                        start: start,
-                        end: i,
-                    };
+                    return Some((start, i));
                 }
             }
         }
     }
 
-    range.to_owned()
+    None
 }
 
 fn main() {
