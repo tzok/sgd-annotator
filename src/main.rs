@@ -10,7 +10,7 @@ use clap::Parser;
 use fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use flate2::read::GzDecoder;
 
-use translator::Translator;
+use translator::{GenomicRange, Translator};
 
 mod fasta;
 mod tests;
@@ -26,11 +26,12 @@ struct Args {
     output: String,
 }
 
-fn load_genome_gz(path: &Path) -> String {
+fn load_genome_gz(path: &Path) -> (String, Vec<f32>) {
     let file = File::open(path).unwrap();
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
-    let mut result = String::new();
+    let mut sequence = String::new();
+    let mut profile: Vec<f32> = Vec::new();
 
     for (i, line) in reader.lines().enumerate() {
         if i == 0 {
@@ -38,15 +39,14 @@ fn load_genome_gz(path: &Path) -> String {
         }
 
         if let Ok(content) = line {
-            result += &content
-                .split_whitespace()
-                .nth(1)
-                .map(|s| s.to_ascii_uppercase().replace("T", "U"))
-                .unwrap();
+            let split: Vec<&str> = content.split_whitespace().collect();
+
+            sequence += &split[1].to_ascii_uppercase().replace("T", "U");
+            profile.push(split[27].parse().unwrap_or(f32::NAN));
         }
     }
 
-    result
+    (sequence, profile)
 }
 
 fn translate_all(
@@ -54,6 +54,7 @@ fn translate_all(
     utr5p: &HashMap<String, Fasta>,
     utr3p: &HashMap<String, Fasta>,
     translator: &Translator,
+    profile: &Vec<f32>,
 ) -> HashMap<String, (usize, usize)> {
     let mut ranges = HashMap::new();
 
@@ -62,8 +63,8 @@ fn translate_all(
             translator.translate_genomic_range(&fasta.genomic_range())
         {
             if let Some(utr) = utr5p.get(*name) {
-                if let Some((utr_start, utr_end)) =
-                    translator.translate_genomic_range(&utr.genomic_range())
+                let fixed_range = dynamically_fix_range_for_utr(utr, translator, profile);
+                if let Some((utr_start, utr_end)) = translator.translate_genomic_range(&fixed_range)
                 {
                     start = min(start, utr_start);
                     end = max(end, utr_end);
@@ -71,8 +72,8 @@ fn translate_all(
             }
 
             if let Some(utr) = utr3p.get(*name) {
-                if let Some((utr_start, utr_end)) =
-                    translator.translate_genomic_range(&utr.genomic_range())
+                let fixed_range = dynamically_fix_range_for_utr(utr, translator, profile);
+                if let Some((utr_start, utr_end)) = translator.translate_genomic_range(&fixed_range)
                 {
                     start = min(start, utr_start);
                     end = max(end, utr_end);
@@ -164,6 +165,7 @@ fn fill_annotations(
     ranges: &HashMap<String, (usize, usize)>,
     orders: &HashMap<String, usize>,
     translator: &Translator,
+    profile: &Vec<f32>,
 ) -> Vec<Vec<String>> {
     let max = orders.values().max().unwrap();
     let mut annotations: Vec<Vec<String>> = Vec::with_capacity(genome.len());
@@ -195,7 +197,7 @@ fn fill_annotations(
 
         if category == "ORF" {
             if let Some(fasta) = utr5p.get(*name) {
-                let range = fasta.genomic_range();
+                let range = dynamically_fix_range_for_utr(fasta, translator, profile);
                 let (start, end) = translator.translate_genomic_range(&range).unwrap();
                 for i in start..=end {
                     annotations[i][*order * 4 + 1] = "UTR 5'".to_string();
@@ -203,7 +205,7 @@ fn fill_annotations(
             }
 
             if let Some(fasta) = utr3p.get(*name) {
-                let range = fasta.genomic_range();
+                let range = dynamically_fix_range_for_utr(fasta, translator, profile);
                 let (start, end) = translator.translate_genomic_range(&range).unwrap();
                 for i in start..=end {
                     annotations[i][*order * 4 + 1] = "UTR 3'".to_string();
@@ -287,10 +289,49 @@ fn store_result(input: &Path, output: &Path, annotations: Vec<Vec<String>>) {
     }
 }
 
+fn dynamically_fix_range_for_utr(
+    fasta: &Fasta,
+    translator: &Translator,
+    profile: &Vec<f32>,
+) -> GenomicRange {
+    let range = fasta.genomic_range();
+
+    if let Some((start, end)) = translator.translate_genomic_range(&range) {
+        let is_5p = fasta.header.contains("five_prime");
+        let is_plus = fasta.header.contains("strand=+");
+
+        if (is_5p && is_plus) || (!is_5p && !is_plus) {
+            for i in (start..=end).rev() {
+                let slice = &profile[i - 5..=i];
+                if slice.iter().all(|x| x.is_nan()) {
+                    return GenomicRange {
+                        chromosome: range.chromosome,
+                        start: i + 2, // +1 for skipping this nucleotide, +1 for counting from 1 not 0 in the profile file
+                        end: end,
+                    };
+                }
+            }
+        } else {
+            for i in start..=end {
+                let slice = &profile[i..=i + 5];
+                if slice.iter().all(|x| x.is_nan()) {
+                    return GenomicRange {
+                        chromosome: range.chromosome,
+                        start: start,
+                        end: i,
+                    };
+                }
+            }
+        }
+    }
+
+    range.to_owned()
+}
+
 fn main() {
     let args = Args::parse();
 
-    let genome = load_genome_gz(Path::new(&args.input));
+    let (genome, profile) = load_genome_gz(Path::new(&args.input));
     let translator = Translator::new(&genome);
 
     let orf_genomic = load_fasta_gz(Path::new("../data/orf_genomic.fasta.gz"));
@@ -314,7 +355,7 @@ fn main() {
     let utr5p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_5prime_UTRs.fsa.gz"));
     let utr3p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_3prime_UTRs.fsa.gz"));
 
-    let ranges = translate_all(&all_genomic, &utr5p, &utr3p, &translator);
+    let ranges = translate_all(&all_genomic, &utr5p, &utr3p, &translator, &profile);
     let graph = create_graph(&all_genomic, &ranges);
     let orders = determine_order(&all_genomic, &graph);
 
@@ -330,6 +371,7 @@ fn main() {
         &ranges,
         &orders,
         &translator,
+        &profile,
     );
     store_result(Path::new(&args.input), Path::new(&args.output), annotations);
 }

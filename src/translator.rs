@@ -76,7 +76,7 @@ impl Display for YeastChromosome {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct GenomicRange {
     pub chromosome: YeastChromosome,
     pub start: usize,
