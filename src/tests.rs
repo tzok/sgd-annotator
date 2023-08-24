@@ -161,7 +161,7 @@ mod tests {
     fn translator() {
         init();
 
-        let genome = load_genome_gz(Path::new("../data/tests/genome.txt.gz"));
+        let (genome, _) = load_genome_gz(Path::new("../data/tests/genome.txt.gz"));
         let sample = load_fasta_gz(Path::new("../data/tests/sample.fasta.gz"));
         let translator = Translator::new(&genome);
 
