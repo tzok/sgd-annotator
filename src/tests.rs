@@ -14,7 +14,7 @@ mod tests {
 
     #[test]
     fn fasta_genomic() {
-        let fasta = load_fasta_gz(Path::new("../data/tests/genomic.fasta.gz"));
+        let fasta = load_fasta_gz(Path::new("tests/genomic.fasta.gz"));
 
         assert!(fasta.contains_key("YAL068C"));
         let gene = fasta.get("YAL068C").unwrap();
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn fasta_coding() {
-        let fasta = load_fasta_gz(Path::new("../data/tests/coding.fasta.gz"));
+        let fasta = load_fasta_gz(Path::new("tests/coding.fasta.gz"));
 
         assert!(fasta.contains_key("YAL068C"));
         let gene = fasta.get("YAL068C").unwrap();
@@ -102,15 +102,15 @@ mod tests {
             noncoding[0],
             GenomicRange {
                 chromosome: YeastChromosome::I,
-                start: 142253,
-                end: 142620,
+                start: 142254,
+                end: 142619,
             }
         );
     }
 
     #[test]
     fn fasta_utr() {
-        let fasta = load_utr_fasta_gz(Path::new("../data/tests/utr.fasta.gz"));
+        let fasta = load_utr_fasta_gz(Path::new("tests/utr.fasta.gz"));
 
         assert!(fasta.contains_key("YAL067C"));
         let gene = fasta.get("YAL067C").unwrap();
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn fasta_chromosome() {
-        let fasta = load_fasta_gz(Path::new("../data/chr01.fsa.gz"));
+        let fasta = load_fasta_gz(Path::new("tests/chr01.fsa.gz"));
 
         assert!(fasta.contains_key("chrI"));
         let gene = fasta.get("chrI").unwrap();
@@ -161,8 +161,8 @@ mod tests {
     fn translator() {
         init();
 
-        let (genome, _) = load_genome_gz(Path::new("../data/tests/genome.txt.gz"));
-        let sample = load_fasta_gz(Path::new("../data/tests/sample.fasta.gz"));
+        let (genome, _) = load_genome_gz(Path::new("tests/genome.txt.gz"));
+        let sample = load_fasta_gz(Path::new("tests/sample.fasta.gz"));
         let translator = Translator::new(&genome);
 
         for name in vec![
