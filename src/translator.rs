@@ -89,7 +89,7 @@ pub struct Translator {
 
 impl Translator {
     pub fn new(genome: &str) -> Self {
-        let paths: Vec<PathBuf> = glob("../data/chr??.fsa.gz")
+        let paths: Vec<PathBuf> = glob("data/chr*.fsa.gz")
             .unwrap()
             .filter_map(|path| {
                 if path.is_ok() {

@@ -8,6 +8,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::data::ensure_all_data;
+
 #[derive(Debug)]
 enum Aspect {
     C,
@@ -257,12 +259,15 @@ fn combine_terms(
 }
 
 fn main() {
-    let slim_lines = read_gene_ontology_slim(Path::new("../data/go_slim_mapping.tab"));
+    // Ensure all data files are present
+    ensure_all_data().unwrap();
+
+    let slim_lines = read_gene_ontology_slim(Path::new("data/go_slim_mapping.tab"));
     let csardi =
-        read_translational_efficiency_csv(Path::new("../data/translational-efficiency-csardi.csv"))
+        read_translational_efficiency_csv(Path::new("data/translational-efficiency-csardi.csv"))
             .unwrap();
     let weinberg = read_translational_efficiency_csv(Path::new(
-        "../data/translational-efficiency-weinberg.csv",
+        "data/translational-efficiency-weinberg.csv",
     ))
     .unwrap();
 

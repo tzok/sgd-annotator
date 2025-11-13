@@ -10,11 +10,13 @@ use clap::Parser;
 use fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use flate2::read::GzDecoder;
 
+use crate::data::ensure_all_data;
 use translator::Translator;
 
 mod fasta;
 mod tests;
 mod translator;
+mod data;
 
 #[derive(Parser)]
 #[command(version)]
@@ -332,12 +334,15 @@ fn dynamically_fix_range_for_utr(
 fn main() {
     let args = Args::parse();
 
+    // Ensure all data files are present
+    ensure_all_data().unwrap();
+
     let (genome, profile) = load_genome_gz(Path::new(&args.input));
     let translator = Translator::new(&genome);
 
-    let orf_genomic = load_fasta_gz(Path::new("../data/orf_genomic.fasta.gz"));
-    let rna_genomic = load_fasta_gz(Path::new("../data/rna_genomic.fasta.gz"));
-    let other_genomic = load_fasta_gz(Path::new("../data/other_features_genomic.fasta.gz"));
+    let orf_genomic = load_fasta_gz(Path::new("data/orf_genomic.fasta.gz"));
+    let rna_genomic = load_fasta_gz(Path::new("data/rna_genomic.fasta.gz"));
+    let other_genomic = load_fasta_gz(Path::new("data/other_features_genomic.fasta.gz"));
 
     let all_genomic: Vec<(&String, &Fasta)> = orf_genomic
         .iter()
@@ -350,11 +355,11 @@ fn main() {
         })
         .collect();
 
-    let orf_coding = load_fasta_gz(Path::new("../data/orf_coding.fasta.gz"));
-    let rna_coding = load_fasta_gz(Path::new("../data/rna_coding.fasta.gz"));
+    let orf_coding = load_fasta_gz(Path::new("data/orf_coding.fasta.gz"));
+    let rna_coding = load_fasta_gz(Path::new("data/rna_coding.fasta.gz"));
 
-    let utr5p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_5prime_UTRs.fsa.gz"));
-    let utr3p = load_utr_fasta_gz(Path::new("../data/SGD_all_ORFs_3prime_UTRs.fsa.gz"));
+    let utr5p = load_utr_fasta_gz(Path::new("data/5prime_utr.fsa.gz"));
+    let utr3p = load_utr_fasta_gz(Path::new("data/3prime_utr.fsa.gz"));
 
     let ranges = translate_all(&all_genomic, &utr5p, &utr3p, &translator, &profile);
     let graph = create_graph(&all_genomic, &ranges);
