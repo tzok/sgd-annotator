@@ -109,6 +109,15 @@ impl Fasta {
             };
         }
 
+        if self.header.contains("[location=mitochondrion]") {
+            let chromosome = YeastChromosome::Mito;
+            return GenomicRange {
+                chromosome,
+                start: 1,
+                end: self.sequence.len(),
+            };
+        }
+
         panic!("Failed to find chromosome in header {}", self.header);
     }
 

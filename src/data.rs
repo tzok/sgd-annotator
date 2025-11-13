@@ -134,9 +134,10 @@ pub fn ensure_all_data() -> Result<()> {
     // Also go_slim_mapping.tab
     ensure_file("http://sgd-archive.yeastgenome.org/curation/literature/go_slim_mapping.tab", "go_slim_mapping.tab")?;
 
+    // FIXME
     // Translational efficiency files (from the code in go-mapper.rs)
-    ensure_file("../data/translational-efficiency-csardi.csv", "translational-efficiency-csardi.csv")?;
-    ensure_file("../data/translational-efficiency-weinberg.csv", "translational-efficiency-weinberg.csv")?;
+    // ensure_file("../data/translational-efficiency-csardi.csv", "translational-efficiency-csardi.csv")?;
+    // ensure_file("../data/translational-efficiency-weinberg.csv", "translational-efficiency-weinberg.csv")?;
 
     Ok(())
 }
