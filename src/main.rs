@@ -42,7 +42,12 @@ fn load_genome_gz(path: &Path) -> (String, Vec<f32>) {
             let split: Vec<&str> = content.split_whitespace().collect();
 
             sequence += &split[1].to_ascii_uppercase().replace("T", "U");
-            profile.push(split[27].parse().unwrap_or(f32::NAN));
+            let value = if split.len() > 27 {
+                split[27].parse().unwrap_or(f32::NAN)
+            } else {
+                f32::NAN
+            };
+            profile.push(value);
         }
     }
 
