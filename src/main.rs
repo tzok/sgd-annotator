@@ -7,16 +7,11 @@ use std::{
 };
 
 use clap::Parser;
-use fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use flate2::read::GzDecoder;
 
-use crate::data::ensure_all_data;
-use translator::Translator;
-
-mod fasta;
-mod tests;
-mod translator;
-mod data;
+use sgd_annotator::data::ensure_all_data;
+use sgd_annotator::fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
+use sgd_annotator::translator::Translator;
 
 #[derive(Parser)]
 #[command(version)]

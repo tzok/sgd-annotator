@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::data::ensure_all_data;
+use sgd_annotator::data::ensure_all_data;
 
 #[derive(Debug)]
 enum Aspect {
