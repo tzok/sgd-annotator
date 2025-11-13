@@ -68,9 +68,9 @@ pub fn ensure_utr_downloaded(url: &str, output_filename: &str) -> Result<()> {
     }
 
     // Extract the zip
-    let zip_file = fs::File::open(zip_path)?;
+    let zip_file = fs::File::open(&zip_path)?;
     let mut archive = zip::ZipArchive::new(zip_file)?;
-    let mut first_file = archive.by_index(0)?;
+    let first_file = archive.by_index(0)?;
     let content = first_file.bytes().collect::<Result<Vec<_>, _>>()?;
 
     // Write as gzipped
