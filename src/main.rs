@@ -12,6 +12,7 @@ use flate2::read::GzDecoder;
 use sgd_annotator::data::ensure_all_data;
 use sgd_annotator::fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use sgd_annotator::translator::Translator;
+use sgd_annotator::load_genome_gz;
 
 #[derive(Parser)]
 #[command(version)]
@@ -23,33 +24,6 @@ struct Args {
     output: String,
 }
 
-fn load_genome_gz(path: &Path) -> (String, Vec<f32>) {
-    let file = File::open(path).unwrap();
-    let decoder = GzDecoder::new(file);
-    let reader = BufReader::new(decoder);
-    let mut sequence = String::new();
-    let mut profile: Vec<f32> = Vec::new();
-
-    for (i, line) in reader.lines().enumerate() {
-        if i == 0 {
-            continue;
-        }
-
-        if let Ok(content) = line {
-            let split: Vec<&str> = content.split_whitespace().collect();
-
-            sequence += &split[1].to_ascii_uppercase().replace("T", "U");
-            let value = if split.len() > 27 {
-                split[27].parse().unwrap_or(f32::NAN)
-            } else {
-                f32::NAN
-            };
-            profile.push(value);
-        }
-    }
-
-    (sequence, profile)
-}
 
 fn translate_all(
     all_genomic: &Vec<(&String, &Fasta)>,
