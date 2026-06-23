@@ -7,5 +7,5 @@
 }:
 {
   languages.rust.enable = true;
-  packages = [ pkgs.openssl ];
+  packages = [ pkgs.openssl pkgs.libdeflate ];
 }

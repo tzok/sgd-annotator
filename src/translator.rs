@@ -125,6 +125,14 @@ impl Translator {
         let base = self.mapping.get(chromosome)?;
         Some(base + index - 1)
     }
+
+    pub fn chromosome_offset(&self, chromosome: &YeastChromosome) -> Option<usize> {
+        self.mapping.get(chromosome).copied()
+    }
+
+    pub fn known_chromosomes(&self) -> impl Iterator<Item = &YeastChromosome> {
+        self.mapping.keys()
+    }
 }
 
 fn find_sequence(genome: &str, fasta: &Fasta) -> Option<usize> {

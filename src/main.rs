@@ -12,7 +12,9 @@ use flate2::read::GzDecoder;
 use sgd_annotator::data::ensure_all_data;
 use sgd_annotator::fasta::{load_fasta_gz, load_utr_fasta_gz, Fasta};
 use sgd_annotator::translator::Translator;
-use sgd_annotator::load_genome_gz;
+use sgd_annotator::{bigwig, load_genome_gz};
+
+use sgd_annotator::bigwig::MissingMode;
 
 #[derive(Parser)]
 #[command(version)]
@@ -22,6 +24,21 @@ struct Args {
 
     #[arg(short, long)]
     output: String,
+
+    #[arg(long, num_args = 1.., value_name = "PATH")]
+    bigwig: Vec<String>,
+
+    #[arg(long, num_args = 1.., value_name = "NAME")]
+    bigwig_name: Vec<String>,
+
+    #[arg(long, num_args = 1.., value_name = "DIR")]
+    bigwig_dir: Vec<String>,
+
+    #[arg(long, num_args = 1.., value_name = "NAME")]
+    bigwig_dir_name: Vec<String>,
+
+    #[arg(long, value_enum, default_value_t = MissingMode::Zero, value_name = "MODE")]
+    bigwig_missing: MissingMode,
 }
 
 
@@ -231,7 +248,13 @@ fn fill_annotations(
     annotations
 }
 
-fn store_result(input: &Path, output: &Path, annotations: Vec<Vec<String>>) {
+fn store_result(
+    input: &Path,
+    output: &Path,
+    annotations: Vec<Vec<String>>,
+    profiles: &[bigwig::BigWigProfile],
+    missing: MissingMode,
+) {
     let fin = File::open(input).unwrap();
     let fout = File::create(output).unwrap();
     let decoder = GzDecoder::new(fin);
@@ -257,11 +280,19 @@ fn store_result(input: &Path, output: &Path, annotations: Vec<Vec<String>>) {
                         .as_bytes(),
                     );
                 }
+                for profile in profiles {
+                    let _ = writer.write(format!("\t{}", profile.name).as_bytes());
+                }
                 let _ = writer.write("\n".as_bytes());
             } else {
                 for annotation in annotations.get(i - 1).unwrap().iter() {
                     let _ = writer.write(b"\t");
                     let _ = writer.write(annotation.as_bytes());
+                }
+                for profile in profiles {
+                    let value = profile.values.get(i - 1).copied().unwrap_or(f32::NAN);
+                    let _ = writer.write(b"\t");
+                    let _ = writer.write(bigwig::format_bigwig_cell(value, missing).as_bytes());
                 }
                 let _ = writer.write(b"\n");
             }
@@ -300,7 +331,7 @@ fn dynamically_fix_range_for_utr(
     None
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Ensure all data files are present
@@ -348,5 +379,50 @@ fn main() {
         &translator,
         &profile,
     );
-    store_result(Path::new(&args.input), Path::new(&args.output), annotations);
+
+    let mut bigwig_profiles: Vec<bigwig::BigWigProfile> = Vec::new();
+    for (idx, bw_path) in args.bigwig.iter().enumerate() {
+        let name = args
+            .bigwig_name
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(|| {
+                std::path::Path::new(bw_path)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| format!("bigwig_{}", idx + 1))
+            });
+        let profile =
+            bigwig::load(std::path::Path::new(bw_path), name, &translator, genome.len())?;
+        bigwig_profiles.push(profile);
+    }
+
+    for (idx, bw_dir) in args.bigwig_dir.iter().enumerate() {
+        let name = args
+            .bigwig_dir_name
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(|| {
+                std::path::Path::new(bw_dir)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| format!("aggregate_{}", idx + 1))
+            });
+        let profile = bigwig::aggregate_dir(
+            std::path::Path::new(bw_dir),
+            name,
+            &translator,
+            genome.len(),
+        )?;
+        bigwig_profiles.push(profile);
+    }
+
+    store_result(
+        Path::new(&args.input),
+        Path::new(&args.output),
+        annotations,
+        &bigwig_profiles,
+        args.bigwig_missing,
+    );
+    Ok(())
 }
