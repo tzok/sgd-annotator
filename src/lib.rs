@@ -2,6 +2,7 @@ pub mod data;
 pub mod fasta;
 pub mod translator;
 pub mod tests;
+pub mod bigwig;
 
 use flate2::read::GzDecoder;
 use std::{
