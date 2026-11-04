@@ -263,6 +263,7 @@ mod tests {
 
     #[test]
     fn load_maps_values_to_genome_indices() {
+        let _ = crate::data::ensure_all_data();
         let (genome, _) = crate::load_genome_gz(std::path::Path::new("tests/genome.txt.gz"));
         let translator = crate::translator::Translator::new(&genome);
         let offset = translator
@@ -292,6 +293,7 @@ mod tests {
 
     #[test]
     fn aggregate_dir_sums_and_preserves_all_nan() {
+        let _ = crate::data::ensure_all_data();
         let (genome, _) = crate::load_genome_gz(std::path::Path::new("tests/genome.txt.gz"));
         let translator = crate::translator::Translator::new(&genome);
         let offset = translator
